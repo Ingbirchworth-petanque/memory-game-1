@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#142b43">
+  <title>Memory Match</title>
+  <style>
+    :root {
+      --navy: #142b43;
+      --blue: #24577a;
+      --blue-light: #eaf3f8;
+      --gold: #f2bd54;
+      --ink: #193047;
+      --muted: #657789;
+      --paper: #f5f8fb;
+      --white: #fff;
+      --shadow: 0 12px 30px rgba(16, 39, 61, .14);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(ellipse at 50% 0%, #ffffff 0%, #edf4f8 48%, #e4edf3 100%);
+    }
+    button { font: inherit; }
+    .screen {
+      min-height: 100vh;
+      width: 100%;
+      padding: clamp(18px, 4vw, 42px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .screen.active { display: flex; }
+
+    /* Welcome screen */
+    .welcome-panel {
+      width: min(900px, 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(28px, 5vh, 46px);
+      text-align: center;
+    }
+    .title-image {
+      display: block;
+      width: min(100%, 760px);
+      height: auto;
+      max-height: 58vh;
+      object-fit: contain;
+      filter: drop-shadow(0 14px 20px rgba(19, 45, 66, .12));
+    }
+    .welcome-caption {
+      margin: -12px 0 0;
+      color: var(--muted);
+      font-size: clamp(15px, 2vw, 18px);
+      letter-spacing: .025em;
+    }
+
+    /* Shared buttons */
+    .action-button {
+      min-height: 54px;
+      padding: 13px 34px;
+      border: 0;
+      border-radius: 999px;
+      color: #172d40;
+      background: linear-gradient(135deg, #ffd77e, var(--gold));
+      box-shadow: 0 7px 0 #d69d36, 0 12px 22px rgba(30, 54, 72, .15);
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: .015em;
+      cursor: pointer;
+      transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+      touch-action: manipulation;
+    }
+    .action-button:hover { filter: brightness(1.04); transform: translateY(-2px); box-shadow: 0 9px 0 #d69d36, 0 15px 25px rgba(30, 54, 72, .17); }
+    .action-button:active { transform: translateY(4px); box-shadow: 0 3px 0 #d69d36, 0 7px 13px rgba(30, 54, 72, .14); }
+    .action-button:focus-visible, .card:focus-visible { outline: 4px solid #4b9bd0; outline-offset: 4px; }
+    .action-button.secondary {
+      min-height: 42px;
+      padding: 9px 20px;
+      color: var(--white);
+      background: var(--blue);
+      box-shadow: 0 4px 0 #183e5b, 0 8px 16px rgba(30, 54, 72, .12);
+      font-size: 14px;
+    }
+    .action-button.secondary:hover { box-shadow: 0 6px 0 #183e5b, 0 10px 18px rgba(30, 54, 72, .15); }
+    .action-button.secondary:active { box-shadow: 0 2px 0 #183e5b; }
+
+    /* Gameplay screen */
+    .game-shell {
+      width: min(790px, 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 22px;
+    }
+    .game-header { width: 100%; text-align: center; }
+    .game-heading {
+      margin: 0 0 16px;
+      color: var(--navy);
+      font-size: clamp(29px, 5vw, 42px);
+      line-height: 1.1;
+      font-weight: 900;
+      letter-spacing: -.04em;
+    }
+    .score-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .score-pill {
+      min-width: 125px;
+      padding: 9px 18px;
+      border: 1px solid rgba(36, 87, 122, .12);
+      border-radius: 14px;
+      background: rgba(255,255,255,.82);
+      box-shadow: 0 4px 12px rgba(21, 51, 75, .06);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .score-pill strong { display: inline-block; margin-left: 5px; color: var(--navy); font-size: 18px; font-variant-numeric: tabular-nums; }
+    .grid-wrap {
+      width: min(100%, 650px);
+      padding: clamp(9px, 2vw, 16px);
+      border: 1px solid rgba(255,255,255,.9);
+      border-radius: 23px;
+      background: rgba(220, 233, 241, .72);
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.9);
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: clamp(7px, 1.6vw, 13px);
+    }
+    .card {
+      position: relative;
+      display: block;
+      width: 100%;
+      min-width: 0;
+      aspect-ratio: 3 / 4;
+      padding: 0;
+      border: 0;
+      border-radius: clamp(8px, 1.5vw, 14px);
+      background: transparent;
+      cursor: pointer;
+      perspective: 900px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .card:disabled { cursor: default; }
+    .card-inner {
+      position: absolute;
+      inset: 0;
+      display: block;
+      border-radius: inherit;
+      transform-style: preserve-3d;
+      transition: transform .48s cubic-bezier(.2,.72,.25,1);
+    }
+    .card.is-flipped .card-inner, .card.is-matched .card-inner { transform: rotateY(180deg); }
+    .card-face {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,.95);
+      border-radius: inherit;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      box-shadow: 0 5px 12px rgba(22, 49, 70, .16);
+    }
+    .card-back { background: #244d6a; }
+    .card-back img { width: 100%; height: 100%; object-fit: cover; }
+    .card-front {
+      transform: rotateY(180deg);
+      background: #fff;
+    }
+    .card-front img { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .card.is-matched .card-face { border-color: #e7bd62; box-shadow: 0 0 0 2px rgba(231,189,98,.28), 0 5px 12px rgba(22,49,70,.12); }
+    .card.is-matched { cursor: default; }
+    .game-footer { display: flex; justify-content: center; padding-bottom: 8px; }
+
+    /* Winning screen */
+    .win-panel {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      width: min(620px, 100%);
+      padding: clamp(34px, 7vw, 64px) 24px;
+      border: 1px solid rgba(255,255,255,.9);
+      border-radius: 30px;
+      background: rgba(255,255,255,.88);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .win-icon { margin: 0 0 14px; font-size: clamp(52px, 10vw, 76px); animation: pop-in .65s cubic-bezier(.2,1.5,.4,1) both; }
+    .win-heading { margin: 0; color: var(--navy); font-size: clamp(31px, 6vw, 48px); line-height: 1.08; letter-spacing: -.045em; }
+    .win-message { margin: 14px 0 24px; color: var(--muted); font-size: clamp(15px, 2.5vw, 18px); }
+    .final-score {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 155px;
+      margin-bottom: 30px;
+      padding: 15px 25px;
+      border-radius: 17px;
+      background: var(--blue-light);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .final-score strong { color: var(--navy); font-size: 32px; line-height: 1.1; }
+    .confetti { position: fixed; z-index: 5; top: -18px; width: 9px; height: 15px; pointer-events: none; animation: fall var(--duration, 3s) linear var(--delay, 0s) forwards; }
+    @keyframes fall { to { transform: translate3d(var(--drift, 40px), 110vh, 0) rotate(760deg); opacity: .9; } }
+    @keyframes pop-in { from { transform: scale(.55) rotate(-12deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+
+    @media (max-width: 520px) {
+      .screen { padding: 16px 12px; }
+      .game-shell { gap: 16px; }
+      .game-heading { margin-bottom: 12px; }
+      .score-pill { min-width: 0; flex: 1; padding: 8px 10px; font-size: 12px; }
+      .score-pill strong { font-size: 16px; }
+      .grid-wrap { border-radius: 16px; padding: 8px; }
+      .card-grid { gap: 6px; }
+      .card-face { border-width: 1.5px; }
+      .action-button { min-height: 52px; }
+    }
+    @media (max-width: 350px) {
+      .card-grid { gap: 4px; }
+      .grid-wrap { padding: 6px; }
+      .score-pill { padding-inline: 6px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <!-- Screen 1: Welcome -->
+    <section id="welcome-screen" class="screen active" aria-label="Welcome">
+      <div class="welcome-panel">
+        <img id="game-title-image" class="title-image" src="images/game-title.jpg" alt="Memory Match game title">
+        <p class="welcome-caption">Turn over the cards, find the pairs and test your memory.</p>
+        <button id="start-button" class="action-button" type="button">Start Game</button>
+      </div>
+    </section>
+
+    <!-- Screen 2: Gameplay -->
+    <section id="game-screen" class="screen" aria-label="Memory Match game">
+      <div class="game-shell">
+        <header class="game-header">
+          <h1 class="game-heading">Memory Match</h1>
+          <div class="score-row" aria-live="polite" aria-atomic="true">
+            <div class="score-pill">Moves<strong id="moves-count">0</strong></div>
+            <div class="score-pill">Matched pairs<strong id="pairs-count">0 / 8</strong></div>
+          </div>
+        </header>
+        <div class="grid-wrap">
+          <div id="card-grid" class="card-grid" aria-label="Sixteen memory cards"></div>
+        </div>
+        <footer class="game-footer">
+          <button id="new-game-button" class="action-button secondary" type="button">↻ New Game</button>
+        </footer>
+      </div>
+    </section>
+
+    <!-- Screen 3: Winning -->
+    <section id="win-screen" class="screen" aria-label="You won">
+      <div class="win-panel">
+        <div class="win-icon" aria-hidden="true">🏆</div>
+        <h1 class="win-heading">Congratulations!<br>You Won!</h1>
+        <p id="win-message" class="win-message">You've found all 8 matching pairs!</p>
+        <div class="final-score"><span>Total moves</span><strong id="final-moves">0</strong></div>
+        <div><button id="play-again-button" class="action-button" type="button">Play Again</button></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    'use strict';
+
+    /* ---------------------------------------------------------------
+       EASY CUSTOMISATION
+       Change IMAGE_FOLDER or the filenames below if your images move.
+       The game always chooses 8 unique images and creates 16 cards.
+       --------------------------------------------------------------- */
+    const GAME_CONFIG = {
+      imageFolder: 'images/',
+      titleImage: 'game-title.jpg',
+      cardBackImage: 'card-back.jpg',
+      frontImages: [
+        'card1.jpg', 'card2.jpg', 'card3.jpg', 'card4.jpg',
+        'card5.jpg', 'card6.jpg', 'card7.jpg', 'card8.jpg',
+        'card9.jpg', 'card10.jpg', 'card11.jpg', 'card12.jpg'
+      ],
+      pairsPerGame: 8,
+      mismatchDelay: 950
+    };
+
+    const screens = {
+      welcome: document.getElementById('welcome-screen'),
+      game: document.getElementById('game-screen'),
+      win: document.getElementById('win-screen')
+    };
+    const grid = document.getElementById('card-grid');
+    const movesDisplay = document.getElementById('moves-count');
+    const pairsDisplay = document.getElementById('pairs-count');
+    const finalMovesDisplay = document.getElementById('final-moves');
+    const winMessage = document.getElementById('win-message');
+
+    let moves = 0;
+    let matchedPairs = 0;
+    let revealedCards = [];
+    let inputLocked = false;
+    let mismatchTimer = null;
+    let winTimer = null;
+    let gameToken = 0; // Invalidates pending callbacks when a new game starts.
+
+    // Use the same configured image paths for the welcome title and card backs.
+    document.getElementById('game-title-image').src = GAME_CONFIG.imageFolder + GAME_CONFIG.titleImage;
+
+    function showScreen(screenName) {
+      Object.entries(screens).forEach(([name, element]) => {
+        const isActive = name === screenName;
+        element.classList.toggle('active', isActive);
+        element.setAttribute('aria-hidden', String(!isActive));
+      });
+    }
+
+    // Fisher-Yates shuffle: unbiased for a uniformly generated random source.
+    function shuffle(array) {
+      const result = [...array];
+      for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+      }
+      return result;
+    }
+
+    function chooseImages() {
+      if (GAME_CONFIG.frontImages.length < GAME_CONFIG.pairsPerGame) {
+        throw new Error(`At least ${GAME_CONFIG.pairsPerGame} front images are required.`);
+      }
+      // Shuffle all 12 first, then take 8 distinct filenames.
+      return shuffle(GAME_CONFIG.frontImages).slice(0, GAME_CONFIG.pairsPerGame);
+    }
+
+    function createDeck() {
+      const selectedImages = chooseImages();
+      const pairedCards = selectedImages.flatMap((filename, pairId) => [
+        { id: `${pairId}-a`, pairId, filename },
+        { id: `${pairId}-b`, pairId, filename }
+      ]);
+      return shuffle(pairedCards);
+    }
+
+    function updateCounters() {
+      movesDisplay.textContent = String(moves);
+      pairsDisplay.textContent = `${matchedPairs} / ${GAME_CONFIG.pairsPerGame}`;
+    }
+
+    function buildCard(cardData, index) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'card';
+      card.dataset.pairId = String(cardData.pairId);
+      card.dataset.cardId = cardData.id;
+      card.setAttribute('aria-label', `Card ${index + 1}, face down`);
+      card.setAttribute('aria-pressed', 'false');
+
+      const inner = document.createElement('span');
+      inner.className = 'card-inner';
+
+      const back = document.createElement('span');
+      back.className = 'card-face card-back';
+      const backImage = document.createElement('img');
+      backImage.src = GAME_CONFIG.imageFolder + GAME_CONFIG.cardBackImage;
+      backImage.alt = '';
+      backImage.draggable = false;
+      back.appendChild(backImage);
+
+      const front = document.createElement('span');
+      front.className = 'card-face card-front';
+      const frontImage = document.createElement('img');
+      frontImage.src = GAME_CONFIG.imageFolder + cardData.filename;
+      frontImage.alt = `Matching picture ${cardData.pairId + 1}`;
+      frontImage.draggable = false;
+      front.appendChild(frontImage);
+
+      inner.append(back, front);
+      card.appendChild(inner);
+      card.addEventListener('click', () => revealCard(card));
+      return card;
+    }
+
+    function startNewGame() {
+      // Cancel any delayed mismatch or win callback from the previous game.
+      gameToken++;
+      clearTimeout(mismatchTimer);
+      clearTimeout(winTimer);
+      mismatchTimer = null;
+      winTimer = null;
+      inputLocked = false;
+      revealedCards = [];
+      moves = 0;
+      matchedPairs = 0;
+      updateCounters();
+      grid.replaceChildren();
+
+      const deck = createDeck();
+      deck.forEach((cardData, index) => grid.appendChild(buildCard(cardData, index)));
+      showScreen('game');
+    }
+
+    function revealCard(card) {
+      if (inputLocked || card.classList.contains('is-flipped') || card.classList.contains('is-matched')) return;
+      if (revealedCards.length >= 2) return;
+
+      card.classList.add('is-flipped');
+      card.setAttribute('aria-pressed', 'true');
+      card.setAttribute('aria-label', `Revealed picture ${Number(card.dataset.pairId) + 1}`);
+      revealedCards.push(card);
+
+      if (revealedCards.length === 2) {
+        moves++;
+        updateCounters();
+        checkForMatch();
+      }
+    }
+
+    function checkForMatch() {
+      const [first, second] = revealedCards;
+      if (first.dataset.pairId === second.dataset.pairId) {
+        first.classList.add('is-matched');
+        second.classList.add('is-matched');
+        first.disabled = true;
+        second.disabled = true;
+        first.setAttribute('aria-label', 'Matched card');
+        second.setAttribute('aria-label', 'Matched card');
+        matchedPairs++;
+        updateCounters();
+        revealedCards = [];
+
+        if (matchedPairs === GAME_CONFIG.pairsPerGame) {
+          const completedGameToken = gameToken;
+          // Briefly let the final successful pair animation be seen.
+          inputLocked = true;
+          winTimer = setTimeout(() => {
+            if (completedGameToken === gameToken) showWinningScreen();
+          }, 550);
+        }
+      } else {
+        inputLocked = true;
+        const currentGameToken = gameToken;
+        mismatchTimer = setTimeout(() => {
+          if (currentGameToken !== gameToken) return;
+          revealedCards.forEach((revealedCard) => {
+            revealedCard.classList.remove('is-flipped');
+            revealedCard.setAttribute('aria-pressed', 'false');
+            revealedCard.setAttribute('aria-label', 'Face-down card');
+          });
+          revealedCards = [];
+          inputLocked = false;
+          mismatchTimer = null;
+        }, GAME_CONFIG.mismatchDelay);
+      }
+    }
+
+    function showWinningScreen() {
+      finalMovesDisplay.textContent = String(moves);
+      winMessage.textContent = `You've found all ${GAME_CONFIG.pairsPerGame} matching pairs!`;
+      showScreen('win');
+      launchConfetti();
+    }
+
+    function launchConfetti() {
+      const pieces = 54;
+      const colours = ['#f2bd54', '#2d80ad', '#e47767', '#6eaa86', '#9b82c7'];
+      for (let i = 0; i < pieces; i++) {
+        const piece = document.createElement('span');
+        piece.className = 'confetti';
+        piece.style.left = `${Math.random() * 100}vw`;
+        piece.style.backgroundColor = colours[i % colours.length];
+        piece.style.setProperty('--duration', `${2.3 + Math.random() * 2.2}s`);
+        piece.style.setProperty('--delay', `${Math.random() * .8}s`);
+        piece.style.setProperty('--drift', `${-90 + Math.random() * 180}px`);
+        piece.style.borderRadius = Math.random() > .5 ? '50%' : '2px';
+        document.body.appendChild(piece);
+        piece.addEventListener('animationend', () => piece.remove(), { once: true });
+      }
+    }
+
+    document.getElementById('start-button').addEventListener('click', startNewGame);
+    document.getElementById('new-game-button').addEventListener('click', startNewGame);
+    document.getElementById('play-again-button').addEventListener('click', startNewGame);
+
+    // Preload the shared card-back image for a smoother first render.
+    const cardBackPreload = new Image();
+    cardBackPreload.src = GAME_CONFIG.imageFolder + GAME_CONFIG.cardBackImage;
+  </script>
+</body>
+</html>
